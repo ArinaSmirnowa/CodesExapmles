@@ -100,6 +100,45 @@ JOIN (
 ) tours ON Clients.clients_id = tours.clients_id;
 
 
+-- Функция, выводящая отели и общую сумму, которую каждый из них заработал
+CREATE FUNCTION TopHotels ()
+RETURNS TABLE
+AS RETURN (
+    SELECT Hotels.hotels_id, SUM(sale_of_trips.sum) AS total_revenue
+        FROM Hotels
+    JOIN take_place_in ON Hotels.hotels_id = take_place_in.hotels_id
+    JOIN tours ON take_place_in.tour_id = tours.tour_id
+    JOIN are_in ON tours.tour_id = are_in.tour_id
+    JOIN sale_of_trips ON are_in.sale_id = sale_of_trips.sale_id
+    GROUP BY Hotels.hotels_id
+);
+
+SELECT * 
+FROM TopHotels();
+
+
+-- Функция, которая выводит список отелей, которые были забронированы в заданной стране. 
+-- А также клиента, который забронировал его, и сколько он заплатил
+CREATE FUNCTION SalesInCountry (@countryName VARCHAR(50))
+RETURNS TABLE
+AS RETURN (
+	SELECT s.sale_id, s.sum, c.clients_name, c.surname, c.patronymic, h.hotels_country_name
+		FROM sale_of_trips s
+	JOIN Clients c ON s.clients_id = c.clients_id
+	JOIN located l ON s.sale_id = l.sale_id
+	JOIN trips t ON l.trip_id = t.trip_id
+	JOIN take_place_in tp ON t.tour_id = tp.tour_id
+	JOIN Hotels h ON tp.hotels_id = h.hotels_id
+	JOIN Countries co ON h.country_id = co.country_id
+	WHERE co.country_name = @countryName
+);
+
+SELECT * 
+FROM SalesInCountry('India');
+
+
+
+
 
 
 
