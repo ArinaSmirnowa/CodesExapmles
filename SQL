@@ -1,3 +1,4 @@
+-- Ниже приведены примеры запросов для базы данных туроператора, схему которого можно посмотреть по ссылке: https://docs.google.com/document/d/1KOAtNrdatmNfZ_7eoORJ9yB7QP4oSUG2dTpX6Kwruro/edit
 -- запрос с EXISTS (выводит фамилию и имя клиента с заданным именем. проверяет есть ли такие записи и только тогда выводит)
 SELECT Clients.surname, Clients.clients_name
 FROM Clients
