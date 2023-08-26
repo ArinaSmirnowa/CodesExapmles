@@ -1,0 +1,105 @@
+-- запрос с EXISTS (выводит фамилию и имя клиента с заданным именем. проверяет есть ли такие записи и только тогда выводит)
+SELECT Clients.surname, Clients.clients_name
+FROM Clients
+WHERE EXISTS (
+    SELECT 1
+    FROM sale_of_trips
+    JOIN located ON sale_of_trips.sale_id = located.sale_id
+    JOIN trips ON located.trip_id = trips.trip_id
+    JOIN are_in ON sale_of_trips.sale_id = are_in.sale_id
+    JOIN tours ON are_in.tour_id = tours.tour_id
+    WHERE Clients.clients_id = sale_of_trips.clients_id
+      AND Clients.clients_name = 'Anna'
+); 
+
+
+-- запрос с CASE (IIF) и агрегированием (CASE определяет одна или несколько продаж, а из агрегирования - SUM заплаченных денег)
+SELECT Clients.surname, Clients.clients_name, 
+CASE 
+    WHEN COUNT(DISTINCT sale_of_trips.sale_id) > 1 THEN 'Multiple sales'
+    ELSE 'Only one sale'
+END AS sale_status,
+SUM(sale_of_trips.sum) AS total_sum
+FROM Clients
+  JOIN sale_of_trips ON Clients.clients_id = sale_of_trips.clients_id
+GROUP BY Clients.clients_id, Clients.surname, Clients.clients_name; 
+
+
+
+
+-- запрос с HAVING и агрегированием (то же, что и в прошлом запросе, но теперь мы конкретно считаем, сколько у человека покупок)
+
+SELECT Clients.surname, Clients.clients_name, 
+COUNT(DISTINCT sale_of_trips.sale_id) AS number_of_sales,
+SUM(sale_of_trips.sum) AS total_sum
+FROM Clients
+  JOIN sale_of_trips ON Clients.clients_id = sale_of_trips.clients_id
+  JOIN located ON sale_of_trips.sale_id = located.sale_id
+
+GROUP BY Clients.clients_id, Clients.surname, Clients.clients_name
+HAVING COUNT(DISTINCT sale_of_trips.sale_id) > 1; 
+
+
+-- запрос, использующий оконную функцию LAG или LEAD для выполнения сравнения данных в разных периодах 
+-- (сравнивает предыдущие покупки клиентов и нынешние - если значение NULL, то человек совершил одну покупку - сравнивать не с чем)
+SELECT sale_of_trips.clients_id, sale_of_trips.sale_id, 
+    sale_of_trips.sum, trips.startdate,
+    LAG(sale_of_trips.sum) OVER(PARTITION BY sale_of_trips.clients_id ORDER BY trips.startdate) AS previous_sale_sum
+FROM sale_of_trips
+  JOIN located ON sale_of_trips.sale_id = located.sale_id
+  JOIN trips ON located.trip_id = trips.trip_id
+WHERE trips.startdate BETWEEN '2023-01-01' AND '2023-12-31'
+
+
+-- (1) запрос с подзапросом FROM, агрегированием, группировкой и сортировкой (снова считаем для подходящих клиентов 
+-- число продаж, но теперь сортируем по убыванию числа продаж + группировка по клиентам)
+SELECT Clients.clients_id, 
+     COUNT(sale_of_trips.sale_id) AS number_of_sales
+FROM Clients
+LEFT JOIN sale_of_trips ON Clients.clients_id = sale_of_trips.clients_id
+WHERE Clients.clients_id IN (
+  SELECT sale_of_trips.clients_id
+  FROM sale_of_trips
+  JOIN located ON sale_of_trips.sale_id = located.sale_id
+  JOIN trips ON located.trip_id = trips.trip_id
+  JOIN take_place_in ON trips.tour_id = take_place_in.tour_id
+  JOIN is_in ON take_place_in.hotels_id = is_in.hotels_id
+
+  WHERE startdate BETWEEN '2023-01-01' AND '2023-12-31'
+)
+GROUP BY Clients.clients_id
+ORDER BY number_of_sales DESC; 
+
+
+-- (2) запрос с подзапросом FROM, агрегированием, группировкой и сортировкой (группирока по клиентам, считаем 
+-- общую заплаченную сумму и сортируем по ее возрастанию)
+SELECT Clients.clients_id, Clients.surname, tours.total_cost
+FROM Clients
+JOIN (
+    SELECT sale_of_trips.clients_id, SUM(tours.cost) AS total_cost
+    FROM sale_of_trips 
+    JOIN are_in ON sale_of_trips.sale_id = are_in.sale_id
+    JOIN tours ON are_in.tour_id = tours.tour_id
+    GROUP BY sale_of_trips.clients_id
+) tours ON Clients.clients_id = tours.clients_id
+ORDER BY tours.total_cost ASC;
+
+
+-- запрос SELECT INTO для подготовки выгрузки (создает новуб таблицу Clients_and_costs, 
+-- куда выгружает клиентов и сколько они заплатили)
+SELECT Clients.clients_id, Clients.surname, tours.total_cost
+INTO Clients_and_costs
+FROM Clients
+JOIN (
+    SELECT sale_of_trips.clients_id, SUM(tours.cost) AS total_cost
+    FROM sale_of_trips
+    JOIN are_in ON sale_of_trips.sale_id = are_in.sale_id
+    JOIN tours ON are_in.tour_id = tours.tour_id
+    GROUP BY sale_of_trips.clients_id
+) tours ON Clients.clients_id = tours.clients_id;
+
+
+
+
+
+
